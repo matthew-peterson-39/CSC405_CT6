@@ -10,7 +10,6 @@ if (!gl) {
 
 // Initial clear color (light gray background to see if it's working)
 gl.clearColor(0.9, 0.9, 0.9, 1.0);
-gl.clear(gl.COLOR_BUFFER_BIT);
 
 // Basic viewport setup matching canvas size
 gl.viewport(0, 0, canvas.width, canvas.height);
@@ -35,7 +34,7 @@ const fragmentShaderSource = `
     precision mediump float;
    
     void main() {
-        gl_FragColor = vec4(0.7, 0.7, 0.7, 1.0);
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);  // Black color for better visibility
     }
 `;
 
@@ -96,6 +95,25 @@ mat4.perspective(projectionMatrix,
     100.0
 );
 
+// Test vertices for a simple triangle
+const vertices = new Float32Array([
+    0.0, 1.0, 0.0,    // top
+    -1.0, -1.0, 0.0,  // bottom left
+    1.0, -1.0, 0.0    // bottom right
+]);
+
+// Create and bind vertex buffer
+const vertexBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+// Get attribute location
+const positionAttribLocation = gl.getAttribLocation(shaderProgram, 'aPosition');
+
+// Get uniform locations
+const modelViewMatrixLocation = gl.getUniformLocation(shaderProgram, 'uModelViewMatrix');
+const projectionMatrixLocation = gl.getUniformLocation(shaderProgram, 'uProjectionMatrix');
+
 console.log("Shader program and matrices initialized");
 
 // Add camera update function
@@ -133,6 +151,21 @@ function render() {
     
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     updateCameraPosition();
+    
+    // Use our shader program
+    gl.useProgram(shaderProgram);
+
+    // Enable the position attribute
+    gl.enableVertexAttribArray(positionAttribLocation);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.vertexAttribPointer(positionAttribLocation, 3, gl.FLOAT, false, 0, 0);
+    
+    // Update uniforms
+    gl.uniformMatrix4fv(modelViewMatrixLocation, false, modelViewMatrix);
+    gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix);
+    
+    // Draw the triangle
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
     
     requestAnimationFrame(render);
 }
