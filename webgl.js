@@ -1,24 +1,27 @@
-// Get the WebGL context
+// WebGL Sphere Visualization
+// This code creates an interactive 3D sphere using WebGL, with controls for camera position,
+// subdivision level, lighting, and rendering mode (solid/wireframe).
+
+// ---- Initial Setup ----
+// Get the WebGL rendering context from our canvas element
 const canvas = document.getElementById("glCanvas");
 const gl = canvas.getContext("webgl");
 
-// Basic error checking - essential first step in WebGL
+// Make sure WebGL is available and working
 if (!gl) {
     alert("Unable to initialize WebGL. Your browser or machine may not support it.");
     throw new Error("WebGL context initialization failed");
 }
 
-// Initial clear color (light gray background to see if it's working)
+// Set the background color to light gray and initialize the viewport
 gl.clearColor(0.9, 0.9, 0.9, 1.0);
-
-// Basic viewport setup matching canvas size
 gl.viewport(0, 0, canvas.width, canvas.height);
 
-// Console log to verify initialization
-console.log("WebGL initialized successfully");
-
-
-// Vertex shader for handling positions and normals
+// ---- Shader Definitions ----
+// Vertex shader: Handles vertex positions and lighting calculations
+// - aPosition: The 3D position of each vertex
+// - aNormal: The normal vector for lighting calculations
+// - Various matrices for 3D transformation
 const vertexShaderSource = `
     attribute vec3 aPosition;
     attribute vec3 aNormal;
@@ -31,18 +34,20 @@ const vertexShaderSource = `
     varying vec3 vPosition;
    
     void main() {
-        // Transform the position into view space
+        // Transform vertex position into view space for lighting calculations
         vec4 viewPosition = uModelViewMatrix * vec4(aPosition, 1.0);
         vPosition = viewPosition.xyz;
         
-        // Transform the normal into view space
+        // Transform the normal vector for lighting calculations
         vNormal = normalize((uNormalMatrix * vec4(aNormal, 0.0)).xyz);
         
+        // Final position of the vertex in clip space
         gl_Position = uProjectionMatrix * viewPosition;
     }
 `;
 
-// Fragment shader with proper lighting calculations
+// Fragment shader: Calculates the final color of each pixel
+// Implements basic lighting with ambient and diffuse components
 const fragmentShaderSource = `
     precision mediump float;
    
@@ -53,27 +58,27 @@ const fragmentShaderSource = `
     uniform float uLightIntensity;
    
     void main() {
-        // Fixed light position in view space
+        // Light position in view space
         vec3 lightPos = vec3(2.0, 2.0, 2.0);
         
-        // Calculate the light direction
+        // Calculate direction from fragment to light
         vec3 lightDir = normalize(lightPos - vPosition);
         
-        // Ambient term
+        // Ambient lighting (constant low-level light)
         float ambient = 0.2;
         
-        // Diffuse term
+        // Diffuse lighting (directional light based on surface angle)
         float diff = max(dot(normalize(vNormal), lightDir), 0.0);
         
-        // Combine lighting components
+        // Combine lighting components and apply intensity
         float lighting = (ambient + diff * 0.8) * uLightIntensity;
         
         gl_FragColor = vec4(vec3(lighting), 1.0);
     }
 `;
 
-
-// Shader compilation utility
+// ---- Shader Compilation Functions ----
+// Compiles individual shader from source code
 function compileShader(gl, source, type) {
     const shader = gl.createShader(type);
     gl.shaderSource(shader, source);
@@ -87,7 +92,7 @@ function compileShader(gl, source, type) {
     return shader;
 }
 
-// Program creation utility
+// Creates complete shader program from vertex and fragment shaders
 function initShaderProgram(gl, vertexSource, fragmentSource) {
     const vertexShader = compileShader(gl, vertexSource, gl.VERTEX_SHADER);
     const fragmentShader = compileShader(gl, fragmentSource, gl.FRAGMENT_SHADER);
@@ -96,6 +101,7 @@ function initShaderProgram(gl, vertexSource, fragmentSource) {
     gl.attachShader(program, vertexShader);
     gl.attachShader(program, fragmentShader);
     gl.linkProgram(program);
+    
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
         console.error('Program linking error:', gl.getProgramInfoLog(program));
         return null;
@@ -104,49 +110,51 @@ function initShaderProgram(gl, vertexSource, fragmentSource) {
     return program;
 }
 
-// Initialize shader program
+// Initialize our shader program
 const shaderProgram = initShaderProgram(gl, vertexShaderSource, fragmentShaderSource);
-
-// Add after shader program initialization
 if (!shaderProgram) {
     throw new Error("Failed to initialize shader program");
 }
 
-// Basic matrices for 3D visualization
-const modelViewMatrix = mat4.create();
-const projectionMatrix = mat4.create();
-const normalMatrix = mat4.create();
+// ---- Scene Setup ----
+// Initialize transformation matrices and camera parameters
+const modelViewMatrix = mat4.create();  // Transform from model to view space
+const projectionMatrix = mat4.create(); // Transform from view to clip space
+const normalMatrix = mat4.create();     // For transforming normal vectors
 
-let radius = 5.0;    // Distance from camera to origin
-let theta = 0.0;     // Horizontal rotation angle
-let phi = Math.PI/2; // Vertical rotation angle
+// Camera and scene control variables
+let radius = 5.0;    // Distance of camera from center
+let theta = 0.0;     // Horizontal camera angle
+let phi = Math.PI/2; // Vertical camera angle
 let isAnimating = true;
-let isWireframe = false;  // Track wireframe rendering state
-let autoRotate = true;  // Control automatic rotation
-let rotationAngle = 0;  // Track current rotation
-const lightPosition = [2.0, 2.0, 2.0];  // Fixed light position in world space
+let isWireframe = false;  // Toggle between solid and wireframe rendering
+let autoRotate = true;    // Auto-rotation of sphere
+let rotationAngle = 0;    // Current rotation angle
+const lightPosition = [2.0, 2.0, 2.0];  // Position of light source
 let rotationMatrix = mat4.create();
 
-// Set up projection matrix
+// Set up perspective projection
 mat4.perspective(projectionMatrix,
-    45 * Math.PI / 180, // 45 degree field of view
-    canvas.width / canvas.height,
-    0.1,
-    100.0
+    45 * Math.PI / 180, // 45-degree field of view
+    canvas.width / canvas.height, // Aspect ratio
+    0.1, // Near clipping plane
+    100.0 // Far clipping plane
 );
 
-// Initialize arrays for vertices and normals
+// ---- Geometry Generation ----
+// Arrays to store vertex positions and normal vectors
 let vertices = [];
 let normals = [];
 
-// Function to normalize a vec3
+// Normalizes a 3D vector
 function normalize(v) {
     const length = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
     return [v[0] / length, v[1] / length, v[2] / length];
 }
 
-// Function to generate initial icosahedron vertices
+// Creates initial icosahedron vertices (20-sided regular polyhedron)
 function generateIcosahedron() {
+    // Golden ratio components for vertex positioning
     const X = 0.525731112119133606;
     const Z = 0.850650808352039932;
     const N = 0.0;
@@ -157,6 +165,7 @@ function generateIcosahedron() {
         Z, X, N,  -Z, X, N,  Z, -X, N,  -Z, -X, N
     ];
 
+    // Indices defining the triangles of the icosahedron
     const indices = [
         1,4,0,  4,9,0,  4,5,9,  8,5,4,  1,8,4,
         1,10,8, 10,3,8, 8,3,5,  3,2,5,  3,7,2,
@@ -167,11 +176,13 @@ function generateIcosahedron() {
     return { vertices, indices };
 }
 
-// Function to subdivide triangles
+// Recursively subdivides triangles to create a smoother sphere
 function subdivideTriangle(v1, v2, v3, depth) {
     if (depth === 0) {
-        // Add triangle vertices and calculate normal
+        // Add the triangle vertices to our arrays
         vertices.push(...v1, ...v2, ...v3);
+        
+        // Calculate and store the normal vector for lighting
         const normal = normalize([
             (v2[1] - v1[1]) * (v3[2] - v1[2]) - (v2[2] - v1[2]) * (v3[1] - v1[1]),
             (v2[2] - v1[2]) * (v3[0] - v1[0]) - (v2[0] - v1[0]) * (v3[2] - v1[2]),
@@ -181,26 +192,26 @@ function subdivideTriangle(v1, v2, v3, depth) {
         return;
     }
 
-    // Calculate midpoints
+    // Calculate midpoints of triangle sides
     const v12 = normalize([(v1[0] + v2[0])/2, (v1[1] + v2[1])/2, (v1[2] + v2[2])/2]);
     const v23 = normalize([(v2[0] + v3[0])/2, (v2[1] + v3[1])/2, (v2[2] + v3[2])/2]);
     const v31 = normalize([(v3[0] + v1[0])/2, (v3[1] + v1[1])/2, (v3[2] + v1[2])/2]);
 
-    // Recursively subdivide
+    // Recursively subdivide the four new triangles
     subdivideTriangle(v1, v12, v31, depth - 1);
     subdivideTriangle(v2, v23, v12, depth - 1);
     subdivideTriangle(v3, v31, v23, depth - 1);
     subdivideTriangle(v12, v23, v31, depth - 1);
 }
 
-// Generate sphere geometry
+// Generates sphere geometry by subdividing an icosahedron
 function generateSphere(subdivisionLevel) {
     vertices = [];
     normals = [];
     
     const icosa = generateIcosahedron();
     
-    // Process each triangle in the icosahedron
+    // Process each triangle of the icosahedron
     for (let i = 0; i < icosa.indices.length; i += 3) {
         const v1 = [
             icosa.vertices[icosa.indices[i] * 3],
@@ -224,35 +235,33 @@ function generateSphere(subdivisionLevel) {
     return { vertices: new Float32Array(vertices), normals: new Float32Array(normals) };
 }
 
-// Create sphere geometry with subdivision level 3
+// Create initial sphere geometry
 const sphereData = generateSphere(3);
 
-// Create and bind vertex buffer
+// ---- Buffer Setup ----
+// Create and populate vertex position buffer
 const positionBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 gl.bufferData(gl.ARRAY_BUFFER, sphereData.vertices, gl.STATIC_DRAW);
 
-// Create and bind normal buffer
+// Create and populate vertex normal buffer
 const normalBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
 gl.bufferData(gl.ARRAY_BUFFER, sphereData.normals, gl.STATIC_DRAW);
 
-// Get attribute locations
+// Get shader attribute and uniform locations for later use
 const positionAttribLocation = gl.getAttribLocation(shaderProgram, 'aPosition');
 const normalAttribLocation = gl.getAttribLocation(shaderProgram, 'aNormal');
-
-// Get uniform locations
 const modelViewMatrixLocation = gl.getUniformLocation(shaderProgram, 'uModelViewMatrix');
 const projectionMatrixLocation = gl.getUniformLocation(shaderProgram, 'uProjectionMatrix');
 const normalMatrixLocation = gl.getUniformLocation(shaderProgram, 'uNormalMatrix');
 const lightIntensityLocation = gl.getUniformLocation(shaderProgram, 'uLightIntensity');
 
-// Default light intensity
+// Set default light intensity
 let lightIntensity = 0.8;
 
-console.log("Shader program and matrices initialized");
-
-// Add camera update function
+// ---- Camera Functions ----
+// Updates camera position based on spherical coordinates
 function updateCameraPosition() {
     const eye = [
         radius * Math.sin(phi) * Math.cos(theta),
@@ -262,89 +271,95 @@ function updateCameraPosition() {
    
     mat4.lookAt(
         modelViewMatrix,
-        eye,              // Camera position
-        [0, 0, 0],       // Look at point (origin)
-        [0, 1, 0]        // Up vector
+        eye,        // Camera position
+        [0, 0, 0],  // Look at center
+        [0, 1, 0]   // Up vector
     );
 
-    // Update normal matrix properly
+    // Update normal matrix for lighting calculations
     mat4.invert(normalMatrix, modelViewMatrix);
     mat4.transpose(normalMatrix, normalMatrix);
 }
 
-// Event listeners
+// ---- Event Listeners ----
+// Camera distance control
 document.getElementById("radiusSlider").addEventListener("input", (e) => {
     radius = parseFloat(e.target.value);
 });
 
+// Horizontal camera angle control
 document.getElementById("thetaSlider").addEventListener("input", (e) => {
     theta = parseFloat(e.target.value);
 });
 
+// Vertical camera angle control
 document.getElementById("phiSlider").addEventListener("input", (e) => {
     phi = parseFloat(e.target.value);
 });
 
+// Sphere detail level control
 document.getElementById("subdivisionSlider").addEventListener("input", (e) => {
     currentSubdivisionLevel = parseInt(e.target.value);
     const sphereData = generateSphere(currentSubdivisionLevel);
     
-    // Update vertex buffer
+    // Update geometry buffers with new sphere data
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, sphereData.vertices, gl.STATIC_DRAW);
     
-    // Update normal buffer
     gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, sphereData.normals, gl.STATIC_DRAW);
 });
 
+// Light intensity control
 document.getElementById("lightIntensitySlider").addEventListener("input", (e) => {
     lightIntensity = parseFloat(e.target.value);
 });
 
+// Toggle between solid and wireframe rendering
 document.getElementById("toggleWireframeBtn").addEventListener("click", () => {
-    isWireframe = !isWireframe;  // Toggle wireframe state
+    isWireframe = !isWireframe;
 });
 
+// Toggle auto-rotation
 document.getElementById("toggleRotationBtn").addEventListener("click", () => {
     autoRotate = !autoRotate;
 });
-
-// Add render function
+// ---- Render Function ----
 function render() {
     if (!isAnimating) return;
    
+    // Clear the canvas
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     updateCameraPosition();
    
-    // Use our shader program
+    // Activate our shader program
     gl.useProgram(shaderProgram);
 
-    // Set up position attribute
+    // Set up vertex positions
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.enableVertexAttribArray(positionAttribLocation);
     gl.vertexAttribPointer(positionAttribLocation, 3, gl.FLOAT, false, 0, 0);
    
-    // Set up normal attribute
+    // Set up vertex normals
     gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
     gl.enableVertexAttribArray(normalAttribLocation);
     gl.vertexAttribPointer(normalAttribLocation, 3, gl.FLOAT, false, 0, 0);
    
-    // Handle rotation
+    // Handle auto-rotation if enabled
     let finalModelViewMatrix = mat4.create();
     if (autoRotate) {
-        rotationAngle += 0.01;
+        rotationAngle += 0.01;  // Increment rotation angle
         mat4.rotateY(rotationMatrix, mat4.create(), rotationAngle);
         mat4.multiply(finalModelViewMatrix, modelViewMatrix, rotationMatrix);
     } else {
         mat4.copy(finalModelViewMatrix, modelViewMatrix);
     }
    
-    // Update normal matrix with rotation
+    // Update normal matrix to account for rotation
     mat4.invert(normalMatrix, finalModelViewMatrix);
     mat4.transpose(normalMatrix, normalMatrix);
    
-    // Update uniforms
+    // Send matrices and lighting data to shader
     gl.uniformMatrix4fv(modelViewMatrixLocation, false, finalModelViewMatrix);
     gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix);
     gl.uniformMatrix4fv(normalMatrixLocation, false, normalMatrix);
@@ -353,18 +368,22 @@ function render() {
    
     // Draw the sphere
     if (isWireframe) {
+        // Draw in wireframe mode - each triangle as a line loop
         for (let i = 0; i < vertices.length / 9; i++) {
             gl.drawArrays(gl.LINE_LOOP, i * 3, 3);
         }
     } else {
+        // Draw in solid mode - all triangles filled
         gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 3);
     }
    
+    // Schedule next frame
     requestAnimationFrame(render);
 }
 
-// Enable depth testing
+// ---- Final Setup ----
+// Enable depth testing to handle 3D rendering correctly
 gl.enable(gl.DEPTH_TEST);
 
-// Start render loop
+// Start the render loop
 render();
