@@ -17,6 +17,7 @@ gl.viewport(0, 0, canvas.width, canvas.height);
 // Console log to verify initialization
 console.log("WebGL initialized successfully");
 
+
 // Vertex shader for handling positions and normals
 const vertexShaderSource = `
     attribute vec3 aPosition;
@@ -27,26 +28,50 @@ const vertexShaderSource = `
     uniform mat4 uNormalMatrix;
    
     varying vec3 vNormal;
+    varying vec3 vPosition;
    
     void main() {
-        vNormal = (uNormalMatrix * vec4(aNormal, 0.0)).xyz;
-        gl_Position = uProjectionMatrix * uModelViewMatrix * vec4(aPosition, 1.0);
+        // Transform the position into view space
+        vec4 viewPosition = uModelViewMatrix * vec4(aPosition, 1.0);
+        vPosition = viewPosition.xyz;
+        
+        // Transform the normal into view space
+        vNormal = normalize((uNormalMatrix * vec4(aNormal, 0.0)).xyz);
+        
+        gl_Position = uProjectionMatrix * viewPosition;
     }
 `;
 
-// Fragment shader with basic color output for now
+// Fragment shader with proper lighting calculations
 const fragmentShaderSource = `
     precision mediump float;
+   
     varying vec3 vNormal;
-    uniform float uLightIntensity;  // Add this line
+    varying vec3 vPosition;
+   
+    uniform vec3 uLightPosition;
+    uniform float uLightIntensity;
    
     void main() {
-        vec3 normal = normalize(vNormal);
-        vec3 light = vec3(0.0, 0.0, 1.0);
-        float intensity = max(dot(normal, light), 0.0) * uLightIntensity;  // Modify this line
-        gl_FragColor = vec4(vec3(intensity), 1.0);
+        // Fixed light position in view space
+        vec3 lightPos = vec3(2.0, 2.0, 2.0);
+        
+        // Calculate the light direction
+        vec3 lightDir = normalize(lightPos - vPosition);
+        
+        // Ambient term
+        float ambient = 0.2;
+        
+        // Diffuse term
+        float diff = max(dot(normalize(vNormal), lightDir), 0.0);
+        
+        // Combine lighting components
+        float lighting = (ambient + diff * 0.8) * uLightIntensity;
+        
+        gl_FragColor = vec4(vec3(lighting), 1.0);
     }
 `;
+
 
 // Shader compilation utility
 function compileShader(gl, source, type) {
@@ -99,6 +124,8 @@ let isAnimating = true;
 let isWireframe = false;  // Track wireframe rendering state
 let autoRotate = true;  // Control automatic rotation
 let rotationAngle = 0;  // Track current rotation
+const lightPosition = [2.0, 2.0, 2.0];  // Fixed light position in world space
+let rotationMatrix = mat4.create();
 
 // Set up projection matrix
 mat4.perspective(projectionMatrix,
@@ -239,8 +266,8 @@ function updateCameraPosition() {
         [0, 0, 0],       // Look at point (origin)
         [0, 1, 0]        // Up vector
     );
-    
-    // Update normal matrix
+
+    // Update normal matrix properly
     mat4.invert(normalMatrix, modelViewMatrix);
     mat4.transpose(normalMatrix, normalMatrix);
 }
@@ -306,33 +333,30 @@ function render() {
     // Handle rotation
     let finalModelViewMatrix = mat4.create();
     if (autoRotate) {
-        rotationAngle += 0.01;  // Control rotation speed
-       
-        // Create rotation matrix
-        const rotationMatrix = mat4.create();
-        mat4.rotateY(rotationMatrix, rotationMatrix, rotationAngle);
-       
-        // Apply rotation to modelViewMatrix
+        rotationAngle += 0.01;
+        mat4.rotateY(rotationMatrix, mat4.create(), rotationAngle);
         mat4.multiply(finalModelViewMatrix, modelViewMatrix, rotationMatrix);
     } else {
-        // Use regular modelViewMatrix without rotation
         mat4.copy(finalModelViewMatrix, modelViewMatrix);
     }
+   
+    // Update normal matrix with rotation
+    mat4.invert(normalMatrix, finalModelViewMatrix);
+    mat4.transpose(normalMatrix, normalMatrix);
    
     // Update uniforms
     gl.uniformMatrix4fv(modelViewMatrixLocation, false, finalModelViewMatrix);
     gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix);
     gl.uniformMatrix4fv(normalMatrixLocation, false, normalMatrix);
     gl.uniform1f(lightIntensityLocation, lightIntensity);
+    gl.uniform3fv(gl.getUniformLocation(shaderProgram, 'uLightPosition'), lightPosition);
    
     // Draw the sphere
     if (isWireframe) {
-        // Draw the sphere in wireframe mode
         for (let i = 0; i < vertices.length / 9; i++) {
             gl.drawArrays(gl.LINE_LOOP, i * 3, 3);
         }
     } else {
-        // Draw the sphere in normal filled mode
         gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 3);
     }
    
