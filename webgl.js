@@ -251,6 +251,19 @@ document.getElementById("phiSlider").addEventListener("input", (e) => {
     phi = parseFloat(e.target.value);
 });
 
+document.getElementById("subdivisionSlider").addEventListener("input", (e) => {
+    currentSubdivisionLevel = parseInt(e.target.value);
+    const sphereData = generateSphere(currentSubdivisionLevel);
+    
+    // Update vertex buffer
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, sphereData.vertices, gl.STATIC_DRAW);
+    
+    // Update normal buffer
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, sphereData.normals, gl.STATIC_DRAW);
+});
+
 // Add render function
 function render() {
     if (!isAnimating) return;
