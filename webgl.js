@@ -273,6 +273,10 @@ document.getElementById("lightIntensitySlider").addEventListener("input", (e) =>
     lightIntensity = parseFloat(e.target.value);
 });
 
+document.getElementById("toggleWireframeBtn").addEventListener("click", () => {
+    isWireframe = !isWireframe;  // Toggle wireframe state
+});
+
 // Add render function
 function render() {
     if (!isAnimating) return;
@@ -300,7 +304,15 @@ function render() {
     gl.uniform1f(lightIntensityLocation, lightIntensity);
     
     // Draw the sphere
-    gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 3);
+    if (isWireframe) {
+        // Draw the sphere in wireframe mode
+        for (let i = 0; i < vertices.length / 9; i++) {
+            gl.drawArrays(gl.LINE_LOOP, i * 3, 3);
+        }
+    } else {
+        // Draw the sphere in normal filled mode
+        gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 3);
+    }
     
     requestAnimationFrame(render);
 }
