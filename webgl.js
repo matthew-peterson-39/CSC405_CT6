@@ -21,10 +21,10 @@ console.log("WebGL initialized successfully");
 // Vertex shader for handling positions and normals
 const vertexShaderSource = `
     attribute vec3 aPosition;
-    
+   
     uniform mat4 uModelViewMatrix;
     uniform mat4 uProjectionMatrix;
-    
+   
     void main() {
         gl_Position = uProjectionMatrix * uModelViewMatrix * vec4(aPosition, 1.0);
     }
@@ -33,7 +33,7 @@ const vertexShaderSource = `
 // Fragment shader with basic color output for now
 const fragmentShaderSource = `
     precision mediump float;
-    
+   
     void main() {
         gl_FragColor = vec4(0.7, 0.7, 0.7, 1.0);
     }
@@ -44,7 +44,7 @@ function compileShader(gl, source, type) {
     const shader = gl.createShader(type);
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
-    
+   
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
         console.error('Shader compilation error:', gl.getShaderInfoLog(shader));
         gl.deleteShader(shader);
@@ -57,17 +57,16 @@ function compileShader(gl, source, type) {
 function initShaderProgram(gl, vertexSource, fragmentSource) {
     const vertexShader = compileShader(gl, vertexSource, gl.VERTEX_SHADER);
     const fragmentShader = compileShader(gl, fragmentSource, gl.FRAGMENT_SHADER);
-    
+   
     const program = gl.createProgram();
     gl.attachShader(program, vertexShader);
     gl.attachShader(program, fragmentShader);
     gl.linkProgram(program);
-
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
         console.error('Program linking error:', gl.getProgramInfoLog(program));
         return null;
     }
-    
+   
     return program;
 }
 
@@ -83,8 +82,14 @@ if (!shaderProgram) {
 const modelViewMatrix = mat4.create();
 const projectionMatrix = mat4.create();
 
+// Add these camera control variables
+let radius = 5.0;    // Distance from camera to origin
+let theta = 0.0;     // Horizontal rotation angle
+let phi = Math.PI/2; // Vertical rotation angle
+let isAnimating = true;
+
 // Set up projection matrix
-mat4.perspective(projectionMatrix, 
+mat4.perspective(projectionMatrix,
     45 * Math.PI / 180, // 45 degree field of view
     canvas.width / canvas.height,
     0.1,
@@ -92,3 +97,48 @@ mat4.perspective(projectionMatrix,
 );
 
 console.log("Shader program and matrices initialized");
+
+// Add camera update function
+function updateCameraPosition() {
+    const eye = [
+        radius * Math.sin(phi) * Math.cos(theta),
+        radius * Math.sin(phi) * Math.sin(theta),
+        radius * Math.cos(phi)
+    ];
+   
+    mat4.lookAt(
+        modelViewMatrix,
+        eye,              // Camera position
+        [0, 0, 0],       // Look at point (origin)
+        [0, 1, 0]        // Up vector
+    );
+}
+
+// Event listeners
+document.getElementById("radiusSlider").addEventListener("input", (e) => {
+    radius = parseFloat(e.target.value);
+});
+
+document.getElementById("thetaSlider").addEventListener("input", (e) => {
+    theta = parseFloat(e.target.value);
+});
+
+document.getElementById("phiSlider").addEventListener("input", (e) => {
+    phi = parseFloat(e.target.value);
+});
+
+// Add render function
+function render() {
+    if (!isAnimating) return;
+    
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    updateCameraPosition();
+    
+    requestAnimationFrame(render);
+}
+
+// Enable depth testing
+gl.enable(gl.DEPTH_TEST);
+
+// Start render loop
+render();
