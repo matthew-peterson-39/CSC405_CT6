@@ -97,6 +97,8 @@ let theta = 0.0;     // Horizontal rotation angle
 let phi = Math.PI/2; // Vertical rotation angle
 let isAnimating = true;
 let isWireframe = false;  // Track wireframe rendering state
+let autoRotate = true;  // Control automatic rotation
+let rotationAngle = 0;  // Track current rotation
 
 // Set up projection matrix
 mat4.perspective(projectionMatrix,
@@ -277,13 +279,17 @@ document.getElementById("toggleWireframeBtn").addEventListener("click", () => {
     isWireframe = !isWireframe;  // Toggle wireframe state
 });
 
+document.getElementById("toggleRotationBtn").addEventListener("click", () => {
+    autoRotate = !autoRotate;
+});
+
 // Add render function
 function render() {
     if (!isAnimating) return;
-    
+   
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     updateCameraPosition();
-    
+   
     // Use our shader program
     gl.useProgram(shaderProgram);
 
@@ -291,18 +297,34 @@ function render() {
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.enableVertexAttribArray(positionAttribLocation);
     gl.vertexAttribPointer(positionAttribLocation, 3, gl.FLOAT, false, 0, 0);
-    
+   
     // Set up normal attribute
     gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
     gl.enableVertexAttribArray(normalAttribLocation);
     gl.vertexAttribPointer(normalAttribLocation, 3, gl.FLOAT, false, 0, 0);
-    
+   
+    // Handle rotation
+    let finalModelViewMatrix = mat4.create();
+    if (autoRotate) {
+        rotationAngle += 0.01;  // Control rotation speed
+       
+        // Create rotation matrix
+        const rotationMatrix = mat4.create();
+        mat4.rotateY(rotationMatrix, rotationMatrix, rotationAngle);
+       
+        // Apply rotation to modelViewMatrix
+        mat4.multiply(finalModelViewMatrix, modelViewMatrix, rotationMatrix);
+    } else {
+        // Use regular modelViewMatrix without rotation
+        mat4.copy(finalModelViewMatrix, modelViewMatrix);
+    }
+   
     // Update uniforms
-    gl.uniformMatrix4fv(modelViewMatrixLocation, false, modelViewMatrix);
+    gl.uniformMatrix4fv(modelViewMatrixLocation, false, finalModelViewMatrix);
     gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix);
     gl.uniformMatrix4fv(normalMatrixLocation, false, normalMatrix);
     gl.uniform1f(lightIntensityLocation, lightIntensity);
-    
+   
     // Draw the sphere
     if (isWireframe) {
         // Draw the sphere in wireframe mode
@@ -313,7 +335,7 @@ function render() {
         // Draw the sphere in normal filled mode
         gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 3);
     }
-    
+   
     requestAnimationFrame(render);
 }
 
