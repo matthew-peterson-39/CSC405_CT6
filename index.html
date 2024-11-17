@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"></script>
+    <script src="webgl.js"></script>
+    <title>CSC405 - CT6 - Sphere Lighting and Shading - Peterson, Matthew</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        
+        #controls {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            width: 400px;
+            padding: 1rem;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 1rem;
+        }
+
+        .control-group {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .control-group label {
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            width: 100%;
+        }
+
+        .button-container {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1rem;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        canvas {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sphere Lighting and Shading Visualization</h1>
+    <canvas id="glCanvas" width="800" height="800"></canvas>
+    <div id="controls">
+        <div class="control-group">
+            <label>Camera Distance:</label>
+            <input type="range" id="radiusSlider" min="2" max="10" step="0.1" value="5">
+        </div>
+        <div class="control-group">
+            <label>Horizontal Rotation:</label>
+            <input type="range" id="thetaSlider" min="0" max="6.28" step="0.01" value="0">
+        </div>
+        <div class="control-group">
+            <label>Vertical Rotation:</label>
+            <input type="range" id="phiSlider" min="0" max="3.14" step="0.01" value="1.57">
+        </div>
+        <div class="control-group">
+            <label>Subdivision Level:</label>
+            <input type="range" id="subdivisionSlider" min="1" max="5" step="1" value="3">
+        </div>
+        <div class="control-group">
+            <label>Light Intensity:</label>
+            <input type="range" id="lightIntensitySlider" min="0" max="1" step="0.1" value="0.8">
+        </div>
+        <div class="button-container">
+            <button id="toggleRotationBtn">Toggle Rotation</button>
+            <button id="toggleWireframeBtn">Toggle Wireframe</button>
+        </div>
+    </div>
+    <script src="sphereVisualization.js"></script>
+</body>
+</html>
