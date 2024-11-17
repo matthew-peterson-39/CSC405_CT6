@@ -95,6 +95,7 @@ const normalMatrix = mat4.create();
 let radius = 5.0;    // Distance from camera to origin
 let theta = 0.0;     // Horizontal rotation angle
 let phi = Math.PI/2; // Vertical rotation angle
+let isAnimating = true;
 let isWireframe = false;  // Track wireframe rendering state
 
 // Set up projection matrix
