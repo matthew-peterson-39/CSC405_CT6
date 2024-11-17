@@ -38,11 +38,12 @@ const vertexShaderSource = `
 const fragmentShaderSource = `
     precision mediump float;
     varying vec3 vNormal;
+    uniform float uLightIntensity;  // Add this line
    
     void main() {
         vec3 normal = normalize(vNormal);
         vec3 light = vec3(0.0, 0.0, 1.0);
-        float intensity = max(dot(normal, light), 0.0);
+        float intensity = max(dot(normal, light), 0.0) * uLightIntensity;  // Modify this line
         gl_FragColor = vec4(vec3(intensity), 1.0);
     }
 `;
@@ -91,11 +92,10 @@ const modelViewMatrix = mat4.create();
 const projectionMatrix = mat4.create();
 const normalMatrix = mat4.create();
 
-// Add these camera control variables
 let radius = 5.0;    // Distance from camera to origin
 let theta = 0.0;     // Horizontal rotation angle
 let phi = Math.PI/2; // Vertical rotation angle
-let isAnimating = true;
+let isWireframe = false;  // Track wireframe rendering state
 
 // Set up projection matrix
 mat4.perspective(projectionMatrix,
@@ -215,6 +215,10 @@ const normalAttribLocation = gl.getAttribLocation(shaderProgram, 'aNormal');
 const modelViewMatrixLocation = gl.getUniformLocation(shaderProgram, 'uModelViewMatrix');
 const projectionMatrixLocation = gl.getUniformLocation(shaderProgram, 'uProjectionMatrix');
 const normalMatrixLocation = gl.getUniformLocation(shaderProgram, 'uNormalMatrix');
+const lightIntensityLocation = gl.getUniformLocation(shaderProgram, 'uLightIntensity');
+
+// Default light intensity
+let lightIntensity = 0.8;
 
 console.log("Shader program and matrices initialized");
 
@@ -264,6 +268,10 @@ document.getElementById("subdivisionSlider").addEventListener("input", (e) => {
     gl.bufferData(gl.ARRAY_BUFFER, sphereData.normals, gl.STATIC_DRAW);
 });
 
+document.getElementById("lightIntensitySlider").addEventListener("input", (e) => {
+    lightIntensity = parseFloat(e.target.value);
+});
+
 // Add render function
 function render() {
     if (!isAnimating) return;
@@ -288,6 +296,7 @@ function render() {
     gl.uniformMatrix4fv(modelViewMatrixLocation, false, modelViewMatrix);
     gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix);
     gl.uniformMatrix4fv(normalMatrixLocation, false, normalMatrix);
+    gl.uniform1f(lightIntensityLocation, lightIntensity);
     
     // Draw the sphere
     gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 3);
